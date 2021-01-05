@@ -14,7 +14,7 @@
 
 <h1>Web BLE sandbox</h1>
 
-<h2>Scan devices!</h2>
+<h2>Scan devices</h2>
 
 00090632-0000-0000-0000-000000090632
 
@@ -22,10 +22,14 @@
 <br/>
 <br/>
 <button id="bt_scan">scan</button>
+<button id="bt_stop">stop</button>
+<button id="bt_start">start</button>
 
 <br><br>
 
 <div id='log'></div>
+
+<div id='meas'></div>
 
 <!-- Place your content here -->
 
@@ -33,7 +37,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"></script>
 
 <script type="text/javascript">
-  
+
+
+var my_characteristic;
+
 $("#bt_scan").click(function () {
   console.log("clicked");
 
@@ -63,34 +70,67 @@ $("#bt_scan").click(function () {
     // Getting RAM 3-8 Characteristic…
     return mlx90632_service.getCharacteristic('00090632-4003-000c-0000-000000090632');
   })
+  .then(characteristic => characteristic.startNotifications())
   .then(characteristic => {
-    console.log('read value');
-    $('#log').append('read value<br>')
-    // Reading Battery Level…
-    return characteristic.readValue();
-  })
-  .then(value => {
-    console.log('value is ');
-    console.log(value);
-    $('#log').append('values are: <br>');
-    ram3 = value.getInt16(0)
-    ram4 = value.getInt16(2)
-    ram5 = value.getInt16(4)
-    ram6 = value.getInt16(6)
-    ram7 = value.getInt16(8)
-    ram8 = value.getInt16(10)
-    $('#log').append('ram3: ' + ram3 + '<br>');
-    $('#log').append('ram4: ' + ram4 + '<br>');
-    $('#log').append('ram5: ' + ram5 + '<br>');
-    $('#log').append('ram6: ' + ram6 + '<br>');
-    $('#log').append('ram7: ' + ram7 + '<br>');
-    $('#log').append('ram8: ' + ram8 + '<br>');
+    my_characteristic = characteristic;
+    characteristic.addEventListener('characteristicvaluechanged',
+                                    handleNotifications);
+      console.log('Notifications have been started.');
   })
   .catch(error => { 
     console.log(error);
     console.error(error); 
   });
 
+});
+
+function handleNotifications(event) {
+  const value = event.target.value;
+    console.log('value is ');
+    console.log(value);
+    $('#meas').html('values are: <br>');
+    ram3 = value.getInt16(0)
+    ram4 = value.getInt16(2)
+    ram5 = value.getInt16(4)
+    ram6 = value.getInt16(6)
+    ram7 = value.getInt16(8)
+    ram8 = value.getInt16(10)
+    $('#meas').append('ram3: ' + ram3 + '<br>');
+    $('#meas').append('ram4: ' + ram4 + '<br>');
+    $('#meas').append('ram5: ' + ram5 + '<br>');
+    $('#meas').append('ram6: ' + ram6 + '<br>');
+    $('#meas').append('ram7: ' + ram7 + '<br>');
+    $('#meas').append('ram8: ' + ram8 + '<br>');
+}
+
+
+
+$("#bt_stop").click(function () {
+  if (my_characteristic) {
+    my_characteristic.stopNotifications()
+    .then(_ => {
+      console.log('> Notifications stopped');
+      my_characteristic.removeEventListener('characteristicvaluechanged',
+          handleNotifications);
+    })
+    .catch(error => {
+      console.log('Argh! ' + error);
+    });
+  }
+});
+
+$("#bt_start").click(function () {
+  if (my_characteristic) {
+    my_characteristic.startNotifications()
+    .then(_ => {
+      console.log('> Notifications started');
+      my_characteristic.addEventListener('characteristicvaluechanged',
+          handleNotifications);
+    })
+    .catch(error => {
+      console.log('Argh! ' + error);
+    });
+  }
 });
 
 </script>
