@@ -43,6 +43,7 @@
 
 var my_characteristic;
 var ble_device;
+var disconnect_requested = false;
 
 
 
@@ -97,7 +98,7 @@ function connect_backoff(max, delay, connect_try, success, fail) {
 function connect() {
   console.log('Connecting to Bluetooth Device...');
 
-
+  disconnect_requested = false;
   return connect_backoff(3 /* max retries */, 2 /* seconds delay */,
     function connect_try() {
       var time = new Date().toJSON().substr(11, 8);
@@ -113,8 +114,6 @@ function connect() {
       console.log(`[${time}]: Failed to reconnect.`);
     })
    .then(server => {
-  // return ble_device.gatt.connect()
-    console.log('> Bluetooth Device connected');
     // Getting mlx90632 Service…
     console.log('get service');
     $('#log').append('get service<br>')
@@ -132,12 +131,16 @@ function connect() {
     characteristic.addEventListener('characteristicvaluechanged',
                                     handleNotifications);
       console.log('Notifications have been started.');
-  })
+  });
 }
 
 function onDisconnected(event) {
   // Object event.target is Bluetooth Device getting disconnected.
   console.log('> Bluetooth Device disconnected');
+  if (!disconnect_requested)
+  {
+    connect();
+  }
 }
 
 
@@ -192,6 +195,7 @@ $("#bt_start").click(function () {
 
 
 $("#bt_disconnect").click(function () {
+  disconnect_requested = true;
   if (!ble_device) {
     return;
   }
