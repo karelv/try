@@ -17,7 +17,7 @@
 
 <h2>Scan devices</h2>
 
-V3<br>
+V4<br>
 
 00090632-0000-0000-0000-000000090632
 
@@ -49,9 +49,54 @@ var ble_device;
 var disconnect_requested = false;
 
 
+function is_win10_or_later() 
+{
+  pos = window.navigator.userAgent.indexOf("Windows NT ");
+  if (pos == -1) return false;
+  return parseFloat(navigator.userAgent.substr(pos+11, 10)) >= 10;
+}
+
+
+function get_os() {
+  if (window.navigator.platform.indexOf("iPhone")          != -1) return "iOS";
+  if (window.navigator.platform.indexOf("iPod")            != -1) return "iOS";
+  if (window.navigator.platform.indexOf("iPad")            != -1) return "iOS";
+  
+  if (window.navigator.userAgent.indexOf("Mac")            != -1) return "MacOS";
+
+  if (window.navigator.userAgent.indexOf("Windows NT 10.0")!= -1) return "Windows 10";
+  if (window.navigator.userAgent.indexOf("Windows NT 6.2") != -1) return "Windows 8";
+  if (window.navigator.userAgent.indexOf("Windows NT 6.1") != -1) return "Windows 7";
+  if (window.navigator.userAgent.indexOf("Windows NT 6.0") != -1) return "Windows Vista";
+  if (window.navigator.userAgent.indexOf("Windows NT 5.1") != -1) return "Windows XP";
+  if (window.navigator.userAgent.indexOf("Windows NT 5.0") != -1) return "Windows 2000";
+
+  if (/Android/.test(window.navigator.userAgent))                 return "Android";
+  if (window.navigator.userAgent.indexOf("X11")            != -1) return "Linux";
+  if (window.navigator.userAgent.indexOf("Linux")          != -1) return "Linux";
+
+  return "Unknown";
+}
+
+
 
 $("#bt_scan").click(function () {
   console.log("clicked");
+  console.log(navigator.appVersion);
+  console.log(navigator);
+
+  alert(get_os());
+  alert(is_win10_or_later());
+
+  var supported = "bluetooth" in navigator;
+  if (supported)
+  {
+    supported = typeof navigator.bluetooth['requestDevice'] === 'function';
+  }
+  alert(supported ? "BLE OK": "NO BLE");
+
+
+  
 
   // navigator.bluetooth.requestDevice({acceptAllDevices: true})
   // navigator.bluetooth.requestDevice({filters: [{ services: 
