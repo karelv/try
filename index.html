@@ -17,7 +17,7 @@
 
 <h2>Scan devices</h2>
 
-V2 <br>
+V3<br>
 
 00090632-0000-0000-0000-000000090632
 
@@ -59,7 +59,7 @@ $("#bt_scan").click(function () {
   //      '49535343-fe7d-4ae5-8fa9-9fafd205e455', 
   //      '00090632-0000-0000-0000-000000090632'
   //     ]} ] })
-  navigator.bluetooth.requestDevice({filters: [{ namePrefix: ['RN4871']}], optionalServices: ['00090632-0000-0000-0000-000000090632', "device_information"] })
+  navigator.bluetooth.requestDevice({filters: [{ namePrefix: 'RN4871'}], optionalServices: ['00090632-0000-0000-0000-000000090632', "device_information"] })
   .then(device => {
     ble_device = device;
     console.log('found!'); 
