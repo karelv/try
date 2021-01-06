@@ -21,9 +21,11 @@
 <br/>
 <br/>
 <br/>
-<button id="bt_scan">scan</button>
-<button id="bt_stop">stop</button>
+<button id="bt_scan">scan+connect</button>
 <button id="bt_start">start</button>
+<button id="bt_stop">stop</button>
+<button id="bt_disconnect">disconnect</button>
+<button id="bt_reconnect">reconnect</button>
 
 <br><br>
 
@@ -40,6 +42,9 @@
 
 
 var my_characteristic;
+var ble_device;
+
+
 
 $("#bt_scan").click(function () {
   console.log("clicked");
@@ -51,14 +56,65 @@ $("#bt_scan").click(function () {
   //      '00090632-0000-0000-0000-000000090632'
   //     ]} ] })
   navigator.bluetooth.requestDevice({filters: [{ namePrefix: ['RN4871']}], optionalServices: ['00090632-0000-0000-0000-000000090632'] })
-  .then(device => { 
+  .then(device => {
+    ble_device = device;
     console.log('found!'); 
     console.log(device.name); 
     $('#log').append(device.name + '<br>')
     // Attempts to connect to remote GATT Server.
-    return device.gatt.connect();
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    return connect ();
   })
-  .then(server => {
+  .catch(error => { 
+    console.log(error);
+    console.error(error); 
+  });
+
+});
+
+
+
+// This function keeps calling "connect_try" until promise resolves or has
+// retried "max" number of times. First retry has a delay of "delay" seconds.
+// "success" is called upon success.
+function connect_backoff(max, delay, connect_try, success, fail) {
+  return connect_try().then(result => {return success(result);})
+  .catch(_ => {
+    if (max === 0) {
+      return fail();
+    }
+    
+    var time = new Date().toJSON().substr(11, 8);
+    console.log(`[${time}]: retrying in ${delay} s... (${max} tries left)`);
+    setTimeout(function() {
+      connect_backoff(--max, delay * 2, connect_try, success, fail);
+    }, delay * 1000);
+  });
+}
+
+
+function connect() {
+  console.log('Connecting to Bluetooth Device...');
+
+
+  return connect_backoff(3 /* max retries */, 2 /* seconds delay */,
+    function connect_try() {
+      var time = new Date().toJSON().substr(11, 8);
+      console.log(`[${time}]: Connecting to Bluetooth Device...`);
+      return ble_device.gatt.connect();
+    },
+    function success(result) {
+      console.log('> Bluetooth Device connected.');
+      return result;
+    },
+    function fail() {
+      var time = new Date().toJSON().substr(11, 8);
+      console.log(`[${time}]: Failed to reconnect.`);
+    })
+   .then(server => {
+  // return ble_device.gatt.connect()
+    console.log('> Bluetooth Device connected');
     // Getting mlx90632 Service…
     console.log('get service');
     $('#log').append('get service<br>')
@@ -77,30 +133,30 @@ $("#bt_scan").click(function () {
                                     handleNotifications);
       console.log('Notifications have been started.');
   })
-  .catch(error => { 
-    console.log(error);
-    console.error(error); 
-  });
+}
 
-});
+function onDisconnected(event) {
+  // Object event.target is Bluetooth Device getting disconnected.
+  console.log('> Bluetooth Device disconnected');
+}
+
 
 function handleNotifications(event) {
+  console.log('got notification!');
   const value = event.target.value;
-    console.log('value is ');
-    console.log(value);
-    $('#meas').html('values are: <br>');
-    ram3 = value.getInt16(0)
-    ram4 = value.getInt16(2)
-    ram5 = value.getInt16(4)
-    ram6 = value.getInt16(6)
-    ram7 = value.getInt16(8)
-    ram8 = value.getInt16(10)
-    $('#meas').append('ram3: ' + ram3 + '<br>');
-    $('#meas').append('ram4: ' + ram4 + '<br>');
-    $('#meas').append('ram5: ' + ram5 + '<br>');
-    $('#meas').append('ram6: ' + ram6 + '<br>');
-    $('#meas').append('ram7: ' + ram7 + '<br>');
-    $('#meas').append('ram8: ' + ram8 + '<br>');
+  $('#meas').html('values are: <br>');
+  ram3 = value.getInt16(0)
+  ram4 = value.getInt16(2)
+  ram5 = value.getInt16(4)
+  ram6 = value.getInt16(6)
+  ram7 = value.getInt16(8)
+  ram8 = value.getInt16(10)
+  $('#meas').append('ram3: ' + ram3 + '<br>');
+  $('#meas').append('ram4: ' + ram4 + '<br>');
+  $('#meas').append('ram5: ' + ram5 + '<br>');
+  $('#meas').append('ram6: ' + ram6 + '<br>');
+  $('#meas').append('ram7: ' + ram7 + '<br>');
+  $('#meas').append('ram8: ' + ram8 + '<br>');
 }
 
 
@@ -123,7 +179,7 @@ $("#bt_start").click(function () {
   if (my_characteristic) {
     my_characteristic.startNotifications()
     .then(_ => {
-      console.log('> Notifications started');
+      console.log(`> Notifications started`);
       my_characteristic.addEventListener('characteristicvaluechanged',
           handleNotifications);
     })
@@ -132,6 +188,37 @@ $("#bt_start").click(function () {
     });
   }
 });
+
+
+
+$("#bt_disconnect").click(function () {
+  if (!ble_device) {
+    return;
+  }
+  console.log('Disconnecting from Bluetooth Device...');
+  if (ble_device.gatt.connected) {
+    ble_device.gatt.disconnect();
+  } else {
+    console.log('> Bluetooth Device is already disconnected');
+  }
+});
+
+
+$("#bt_reconnect").click(function () {
+  if (!ble_device) {
+    return;
+  }
+  if (ble_device.gatt.connected) {
+    console.log('> Bluetooth Device is already connected');
+    return;
+  }
+  connect()
+  .catch(error => {
+    console.log('Argh! ' + error);
+  });
+});
+
+
 
 </script>
 
