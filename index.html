@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -17,7 +18,7 @@
 
 <h2>Scan devices</h2>
 
-V4<br>
+V5<br>
 
 00090632-0000-0000-0000-000000090632
 
@@ -85,15 +86,15 @@ $("#bt_scan").click(function () {
   console.log(navigator.appVersion);
   console.log(navigator);
 
-  alert(get_os());
-  alert(is_win10_or_later());
+  $('#log').append(get_os() + '<br>');
+  $('#log').append(is_win10_or_later() + '<br>');
 
   var supported = "bluetooth" in navigator;
   if (supported)
   {
     supported = typeof navigator.bluetooth['requestDevice'] === 'function';
   }
-  alert(supported ? "BLE OK": "NO BLE");
+  $('#log').append(supported ? "BLE OK": "NO BLE" + '<br>');
 
 
   
@@ -104,6 +105,7 @@ $("#bt_scan").click(function () {
   //      '49535343-fe7d-4ae5-8fa9-9fafd205e455', 
   //      '00090632-0000-0000-0000-000000090632'
   //     ]} ] })
+  $('#log').html('');
   navigator.bluetooth.requestDevice({filters: [{ namePrefix: 'RN4871'}], optionalServices: ['00090632-0000-0000-0000-000000090632', "device_information"] })
   .then(device => {
     ble_device = device;
@@ -116,6 +118,7 @@ $("#bt_scan").click(function () {
     return connect ();
   })
   .catch(error => { 
+    $('#log').html(error + '<br>');
     console.log(error);
     console.error(error); 
   });
