@@ -1,0 +1,282 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta charset="utf-8">
+<title></title>
+<meta name="description" content="">
+<meta name="author" content="">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="">
+<link rel="shortcut icon" href="">
+</head>
+<body>
+
+
+<h1>Web BLE sandbox</h1>
+
+<h2>Scan devices</h2>
+
+V5<br>
+
+00090632-0000-0000-0000-000000090632
+
+<br/>
+<br/>
+<br/>
+<button id="bt_scan">scan+connect</button>
+<button id="bt_start">start</button>
+<button id="bt_stop">stop</button>
+<button id="bt_disconnect">disconnect</button>
+<button id="bt_reconnect">reconnect</button>
+
+<br><br>
+
+<div id='log'></div>
+
+<div id='meas'></div>
+
+<!-- Place your content here -->
+
+<!-- SCRIPTS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.slim.min.js"></script>
+
+<script type="text/javascript">
+
+
+var my_characteristic;
+var ble_device;
+var disconnect_requested = false;
+
+
+function is_win10_or_later() 
+{
+  pos = window.navigator.userAgent.indexOf("Windows NT ");
+  if (pos == -1) return false;
+  return parseFloat(navigator.userAgent.substr(pos+11, 10)) >= 10;
+}
+
+
+function get_os() {
+  if (window.navigator.platform.indexOf("iPhone")          != -1) return "iOS";
+  if (window.navigator.platform.indexOf("iPod")            != -1) return "iOS";
+  if (window.navigator.platform.indexOf("iPad")            != -1) return "iOS";
+  
+  if (window.navigator.userAgent.indexOf("Mac")            != -1) return "MacOS";
+
+  if (window.navigator.userAgent.indexOf("Windows NT 10.0")!= -1) return "Windows 10";
+  if (window.navigator.userAgent.indexOf("Windows NT 6.2") != -1) return "Windows 8";
+  if (window.navigator.userAgent.indexOf("Windows NT 6.1") != -1) return "Windows 7";
+  if (window.navigator.userAgent.indexOf("Windows NT 6.0") != -1) return "Windows Vista";
+  if (window.navigator.userAgent.indexOf("Windows NT 5.1") != -1) return "Windows XP";
+  if (window.navigator.userAgent.indexOf("Windows NT 5.0") != -1) return "Windows 2000";
+
+  if (/Android/.test(window.navigator.userAgent))                 return "Android";
+  if (window.navigator.userAgent.indexOf("X11")            != -1) return "Linux";
+  if (window.navigator.userAgent.indexOf("Linux")          != -1) return "Linux";
+
+  return "Unknown";
+}
+
+
+
+$("#bt_scan").click(function () {
+  console.log("clicked");
+  console.log(navigator.appVersion);
+  console.log(navigator);
+
+  $('#log').append(get_os() + '<br>');
+  $('#log').append(is_win10_or_later() + '<br>');
+
+  var supported = "bluetooth" in navigator;
+  if (supported)
+  {
+    supported = typeof navigator.bluetooth['requestDevice'] === 'function';
+  }
+  $('#log').append(supported ? "BLE OK": "NO BLE" + '<br>');
+
+
+  
+
+  // navigator.bluetooth.requestDevice({acceptAllDevices: true})
+  // navigator.bluetooth.requestDevice({filters: [{ services: 
+  //     ['device_information', 
+  //      '49535343-fe7d-4ae5-8fa9-9fafd205e455', 
+  //      '00090632-0000-0000-0000-000000090632'
+  //     ]} ] })
+  $('#log').html('');
+  navigator.bluetooth.requestDevice({filters: [{ namePrefix: 'RN4871'}], optionalServices: ['00090632-0000-0000-0000-000000090632', "device_information"] })
+  .then(device => {
+    ble_device = device;
+    console.log('found!'); 
+    console.log(device.name); 
+    $('#log').append(device.name + '<br>')
+    // Attempts to connect to remote GATT Server.
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+    return connect ();
+  })
+  .catch(error => { 
+    $('#log').html(error + '<br>');
+    console.log(error);
+    console.error(error); 
+  });
+
+});
+
+
+
+// This function keeps calling "connect_try" until promise resolves or has
+// retried "max" number of times. First retry has a delay of "delay" seconds.
+// "success" is called upon success.
+function connect_backoff(max, delay, connect_try, success, fail) {
+  return connect_try().then(result => {return success(result);})
+  .catch(_ => {
+    if (max === 0) {
+      return fail();
+    }
+    
+    var time = new Date().toJSON().substr(11, 8);
+    console.log(`[${time}]: retrying in ${delay} s... (${max} tries left)`);
+    setTimeout(function() {
+      connect_backoff(--max, delay * 2, connect_try, success, fail);
+    }, delay * 1000);
+  });
+}
+
+
+function connect() {
+  console.log('Connecting to Bluetooth Device...');
+
+  disconnect_requested = false;
+  return connect_backoff(3 /* max retries */, 2 /* seconds delay */,
+    function connect_try() {
+      var time = new Date().toJSON().substr(11, 8);
+      console.log(`[${time}]: Connecting to Bluetooth Device...`);
+      return ble_device.gatt.connect();
+    },
+    function success(result) {
+      console.log('> Bluetooth Device connected.');
+      return result;
+    },
+    function fail() {
+      var time = new Date().toJSON().substr(11, 8);
+      console.log(`[${time}]: Failed to reconnect.`);
+    })
+   .then(server => {
+    // Getting mlx90632 Service…
+    console.log('get service');
+    $('#log').append('get service<br>')
+    return server.getPrimaryService('00090632-0000-0000-0000-000000090632');
+  })
+  .then(mlx90632_service => {
+    console.log('get characteristic');
+    $('#log').append('get characteristic<br>')
+    // Getting RAM 3-8 Characteristic…
+    return mlx90632_service.getCharacteristic('00090632-4003-000c-0000-000000090632');
+  })
+  .then(characteristic => characteristic.startNotifications())
+  .then(characteristic => {
+    my_characteristic = characteristic;
+    characteristic.addEventListener('characteristicvaluechanged',
+                                    handleNotifications);
+      console.log('Notifications have been started.');
+  });
+}
+
+function onDisconnected(event) {
+  // Object event.target is Bluetooth Device getting disconnected.
+  console.log('> Bluetooth Device disconnected');
+  if (!disconnect_requested)
+  {
+    connect();
+  }
+}
+
+
+function handleNotifications(event) {
+  console.log('got notification!');
+  const value = event.target.value;
+  $('#meas').html('values are: <br>');
+  ram3 = value.getInt16(0)
+  ram4 = value.getInt16(2)
+  ram5 = value.getInt16(4)
+  ram6 = value.getInt16(6)
+  ram7 = value.getInt16(8)
+  ram8 = value.getInt16(10)
+  $('#meas').append('ram3: ' + ram3 + '<br>');
+  $('#meas').append('ram4: ' + ram4 + '<br>');
+  $('#meas').append('ram5: ' + ram5 + '<br>');
+  $('#meas').append('ram6: ' + ram6 + '<br>');
+  $('#meas').append('ram7: ' + ram7 + '<br>');
+  $('#meas').append('ram8: ' + ram8 + '<br>');
+}
+
+
+
+$("#bt_stop").click(function () {
+  if (my_characteristic) {
+    my_characteristic.stopNotifications()
+    .then(_ => {
+      console.log('> Notifications stopped');
+      my_characteristic.removeEventListener('characteristicvaluechanged',
+          handleNotifications);
+    })
+    .catch(error => {
+      console.log('Argh! ' + error);
+    });
+  }
+});
+
+$("#bt_start").click(function () {
+  if (my_characteristic) {
+    my_characteristic.startNotifications()
+    .then(_ => {
+      console.log(`> Notifications started`);
+      my_characteristic.addEventListener('characteristicvaluechanged',
+          handleNotifications);
+    })
+    .catch(error => {
+      console.log('Argh! ' + error);
+    });
+  }
+});
+
+
+
+$("#bt_disconnect").click(function () {
+  disconnect_requested = true;
+  if (!ble_device) {
+    return;
+  }
+  console.log('Disconnecting from Bluetooth Device...');
+  if (ble_device.gatt.connected) {
+    ble_device.gatt.disconnect();
+  } else {
+    console.log('> Bluetooth Device is already disconnected');
+  }
+});
+
+
+$("#bt_reconnect").click(function () {
+  if (!ble_device) {
+    return;
+  }
+  if (ble_device.gatt.connected) {
+    console.log('> Bluetooth Device is already connected');
+    return;
+  }
+  connect()
+  .catch(error => {
+    console.log('Argh! ' + error);
+  });
+});
+
+
+
+</script>
+
+
+</body>
+</html>
